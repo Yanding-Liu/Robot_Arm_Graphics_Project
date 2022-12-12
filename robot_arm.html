@@ -1,0 +1,126 @@
+<!-- Rename this file to something else -->
+
+<html>
+  <!-- Vertex Shader -->
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    attribute vec4 vPosition; // 0:3
+    attribute vec4 vColor;
+    attribute vec4 vNormal;
+    uniform mat4 ctm, model_view, projection;
+    uniform vec4 light_position;
+    uniform vec4 flash_position;
+    varying vec4 color;
+    varying vec4 N, L, V;
+    varying float dist;
+
+    uniform vec4 flash_at;
+    varying vec4 LF, FA, NF, LLF;
+
+    // toRHR (to right-hand rule)
+    // DO NOT MODIFY THE toRHR VARIABLE
+    mat4 toRHR = mat4(vec4(1,0,0,0), vec4(0,1,0,0),
+		  vec4(0,0,-1,0), vec4(0,0,0,1));
+    
+    void main()
+    {
+      vec4 position = projection * model_view * ctm * vPosition;
+      N = normalize(model_view * ctm * vNormal);
+      vec4 L_temp = model_view * (light_position - ctm * vPosition);
+      L = normalize(L_temp);
+      vec4 eye_position = vec4(0.0, 0.0, 0.0, 1.0);
+      V = normalize(eye_position - (model_view * ctm * vPosition));
+      dist = length(L_temp);
+      color = vColor;
+
+      vec4 LF_temp = model_view * (flash_position - ctm * vPosition);
+      LF = normalize(LF_temp);
+      vec4 FA_temp = model_view * flash_at;
+      FA = normalize(FA_temp);
+
+      // DO NOT MODIFY THE NEXT LINE
+      gl_Position = toRHR * position;
+    }
+  </script>
+
+  <!-- Fragment Shader -->
+  <script id="fragment-shader" type="x-shader/x-fragment">
+    precision mediump float; 
+    // 0:4
+    varying vec4 color;
+    varying vec4 N, L, V;
+    varying float dist;
+
+    uniform float shininess;
+    uniform float attenuation_constant;
+    uniform float attenuation_linear;
+    uniform float attenuation_quadratic;
+    
+    vec4 ambient, diffuse, specular;
+
+    uniform vec4 flash_at;
+    uniform float flash_angle;
+    uniform float flash_switch;
+    varying vec4 LF, FA;
+    vec4 diffuseF;
+
+
+    void main()
+    {
+      vec4 NN = normalize(N);
+      vec4 VV = normalize(V);
+      vec4 LL = normalize(L);
+      ambient = color * 0.2;
+      ambient.w = 1.0;
+      vec4 H = normalize(LL + VV);
+      diffuse = max(dot(LL, NN), 0.0) * color; // 0:22
+      specular = pow(max(dot(NN,H),0.0),shininess)*vec4(1.0,1.0,1.0,1.0);
+      float attenuation = 1.0/(attenuation_constant + (attenuation_linear * dist) +
+        (attenuation_quadratic * dist * dist));
+      vec4 tempC = ambient + attenuation * (diffuse + specular);
+      vec4 LLF = normalize(LF);
+      vec4 FFA = normalize(FA);
+
+      float angle_cos = dot(-LLF, FFA);
+      if (flash_switch > 0.0 && acos(angle_cos) < flash_angle) {
+        diffuseF = max(dot(LLF, NN), 0.0) * 0.8 * color * pow(angle_cos, 10.0);
+        tempC = tempC + diffuseF;
+        //tempC = vec4(1.0, 0.0, 0.0, 1.0);
+      }
+      //tempC = ambient + attenuation * (diffuse + specular);
+      //vec4 tempC = color;
+      gl_FragColor = vec4(
+        min(tempC.x, 1.0),
+        min(tempC.y, 1.0),
+        min(tempC.z, 1.0),
+        1.0);
+    }
+  </script>
+
+  <!-- Load user-defined libraries and programs -->
+  <script type="text/javascript" src="../common/initShaders.js"></script>
+  <!-- Add more libraries here -->
+  <script type="text/javascript" src="common/linearAlg.js"></script>
+  <script type="text/javascript" src="common/myLib.js"></script>
+  <script type="text/javascript" src="common/shapes.js"></script>
+  <!-- The main program -->
+  <script type="text/javascript" src="robot_arm.js"></script>
+
+  <!-- HTML -->
+  <head>
+    <title>Robot Arm Project</title>
+  </head>
+  
+  <body onload="main();">
+    <h1>Robot Arm Project</h1>
+    <p>Your WebGL canvas is shown below:</p>
+    <canvas id="gl-canvas" width="512" height="512">
+      Sorry;
+    </canvas>
+    <p>ZX for rotating arms</p>
+    <p>QA WS ED for moving arms</p>
+    <p>RF for moving wrist</p>
+    <p>TG for moving fingers</p>
+    <p>Arrow keys and PgUp&PgDn for moving camera</p>
+    <p>Space for turning on and off the spotlight</p>
+  </body>
+</html>
